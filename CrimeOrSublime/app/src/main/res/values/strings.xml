@@ -4,4 +4,5 @@
     <string name="login_email_placeholder">Type your email here</string>
     <string name="login_password_label">Password</string>
     <string name="login_password_palceholder">Type your password here</string>
+    <string name="title_activity_menu">MenuActivity</string>
 </resources>

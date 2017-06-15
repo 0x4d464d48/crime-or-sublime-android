@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:inputType="text"
             android:ems="10"
-            android:id="@+id/emailInput"
+            android:id="@+id/email_input"
             android:layout_gravity="center_horizontal" />
 
         <TextView
@@ -42,14 +42,14 @@
             android:layout_height="wrap_content"
             android:inputType="textPassword"
             android:ems="10"
-            android:id="@+id/passwordInput"
+            android:id="@+id/password_input"
             android:layout_gravity="center_horizontal" />
 
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Submit"
-            android:id="@+id/loginButton"
+            android:id="@+id/login_button"
             android:onClick="sendCredentials"
             android:layout_gravity="center_horizontal" />
 
