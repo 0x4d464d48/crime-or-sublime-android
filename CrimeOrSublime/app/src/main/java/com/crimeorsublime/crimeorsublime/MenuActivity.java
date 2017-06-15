@@ -3,9 +3,13 @@ package com.crimeorsublime.crimeorsublime;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Base64;
@@ -19,6 +23,8 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.CookieHandler;
@@ -28,10 +34,13 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class MenuActivity extends AppCompatActivity {
     private static final String IMGUR_ID = "fa4129345194014";
     public ImageView mImageView;
+    private String mCurrentPhotoPath;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,8 +60,24 @@ public class MenuActivity extends AppCompatActivity {
 
     public void takePhoto(View view) {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        // Ensure that there's a camera activity to handle the intent
         if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-            startActivityForResult(takePictureIntent, 1);
+            // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+/*                Uri photoURI = FileProvider.getUriForFile(this,
+                        "com.crimeorsublime.crimeorsublime.fileprovider",
+                        photoFile);*/
+                Uri photoURI = Uri.fromFile(photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                startActivityForResult(takePictureIntent, 0);
+            }
         }
     }
 
@@ -60,26 +85,54 @@ public class MenuActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         mImageView = (ImageView) findViewById(R.id.image);
 
-        if (requestCode == 1 && resultCode == RESULT_OK) {
-            Bundle extras = data.getExtras();
-            Bitmap imageBitmap = (Bitmap) extras.get("data");
-            if (imageBitmap == null) {
-                Log.d("NOPE:", "Bitmap missing");
-                return;
-            }
+        if (requestCode == 0 && resultCode == RESULT_OK) {
+            new UploadImage().execute();
+/*            if (data != null) {
+                Bundle extras = data.getExtras();
+                Bitmap imageBitmap = (Bitmap) extras.get("data");
+                if (imageBitmap == null) {
+                    Log.d("NOPE:", "Bitmap missing");
+                    return;
+                }
 
-            Log.d("YEP:", "You win!");
+                Uri photoUri = (Uri) extras.get(MediaStore.EXTRA_OUTPUT);
+                if (photoUri == null) {
+                    Log.d("NOPE:", "Photo extra is missing");
+                    return;
+                }
 
-            mImageView.setImageBitmap(imageBitmap);
-            new UploadImage().execute(imageBitmap);
+                Log.d("YEP:", "You win!");
+
+                mImageView.setImageBitmap(imageBitmap);
+                new UploadImage().execute(imageBitmap);
+            } else {
+                Log.e("NOPE", "No way dood");
+            } */
         }
+    }
+
+
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        // Save a file: path for use with ACTION_VIEW intents
+        mCurrentPhotoPath = image.getAbsolutePath();
+        return image;
     }
 
     private class UploadImage extends AsyncTask<Bitmap, Void, String> {
 
         @Override
         protected String doInBackground(Bitmap... params) {
-            Bitmap imageBitmap = params[0];
+            //Bitmap imageBitmap = params[0];
 
             // String loginUrl = "http://192.168.0.164:8000/session-create-user";
             String imgurUrl = "https://api.imgur.com/3/image.json";
@@ -95,6 +148,16 @@ public class MenuActivity extends AppCompatActivity {
             JSONObject response;
             JSONObject submission = new JSONObject();
             String stringResponse = null;
+
+            Bitmap imageBitmap = BitmapFactory.decodeFile(mCurrentPhotoPath);
+
+            Log.d("THE FILE:", mCurrentPhotoPath);
+
+            if (imageBitmap == null) {
+                Log.d("OMFG", "IT'S NULL");
+            } else {
+                Log.d("OMFG", "IT'S NOT NULL!!!");
+            }
 
             try {
 
