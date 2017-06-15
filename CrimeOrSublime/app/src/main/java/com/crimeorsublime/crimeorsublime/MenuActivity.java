@@ -9,13 +9,19 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.safetynet.SafetyNet;
+import com.google.android.gms.safetynet.SafetyNetApi;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -24,12 +30,8 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.CookieHandler;
-import java.net.CookieManager;
-import java.net.CookiePolicy;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
@@ -37,7 +39,9 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class MenuActivity extends AppCompatActivity {
+public class MenuActivity extends AppCompatActivity
+        implements GoogleApiClient.OnConnectionFailedListener, GoogleApiClient.ConnectionCallbacks {
+    private GoogleApiClient mGoogleApiClient;
     private static final String IMGUR_ID = "fa4129345194014";
     public ImageView mImageView;
     private String mCurrentPhotoPath;
@@ -50,6 +54,13 @@ public class MenuActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(SafetyNet.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+
+        mGoogleApiClient.connect();
         new VerifySession().execute();
     }
 
@@ -86,7 +97,27 @@ public class MenuActivity extends AppCompatActivity {
         mImageView = (ImageView) findViewById(R.id.image);
 
         if (requestCode == 0 && resultCode == RESULT_OK) {
-            new UploadImage().execute();
+            SafetyNet.SafetyNetApi.verifyWithRecaptcha(mGoogleApiClient, "6LcmkiUUAAAAACYiFpomZ7nL5FZszd3Rm7ieCSi1")
+                    .setResultCallback(
+                            new ResultCallback<SafetyNetApi.RecaptchaTokenResult>() {
+                                @Override
+                                public void onResult(SafetyNetApi.RecaptchaTokenResult result) {
+                                    Status status = result.getStatus();
+                                    if ((status != null) && status.isSuccess()) {
+                                        Log.d("CAPT WIN:", "WIN!");
+                                        if (!result.getTokenResult().isEmpty()) {
+                                            // User response token must be validated using the
+                                            // reCAPTCHA site verify API.
+                                            Log.d("THE TOKEN", result.getTokenResult().toString());
+                                            new UploadImage().execute();
+
+                                        }
+                                    } else {
+                                        Log.d("CAPT LOOSE:", "Error occured getting reCaptcha");
+                                        return;
+                                    }
+                                }
+                            });
 /*            if (data != null) {
                 Bundle extras = data.getExtras();
                 Bitmap imageBitmap = (Bitmap) extras.get("data");
@@ -126,6 +157,21 @@ public class MenuActivity extends AppCompatActivity {
         // Save a file: path for use with ACTION_VIEW intents
         mCurrentPhotoPath = image.getAbsolutePath();
         return image;
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+        Log.d("YO CONNECT FAILED:", connectionResult.getErrorMessage());
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+//        Log.d("YO CONNECT WORKED:", bundle.toString());
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.d("YO CONNECT SUSPENDED:", Integer.toString(i));
     }
 
     private class UploadImage extends AsyncTask<Bitmap, Void, String> {
