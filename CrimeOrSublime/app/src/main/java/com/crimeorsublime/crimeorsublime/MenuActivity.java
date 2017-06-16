@@ -1,14 +1,20 @@
 package com.crimeorsublime.crimeorsublime;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Base64;
@@ -40,11 +46,17 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class MenuActivity extends AppCompatActivity
-        implements GoogleApiClient.OnConnectionFailedListener, GoogleApiClient.ConnectionCallbacks {
+        implements GoogleApiClient.OnConnectionFailedListener,
+        GoogleApiClient.ConnectionCallbacks,
+        LocationListener {
     private GoogleApiClient mGoogleApiClient;
     private static final String IMGUR_ID = "fa4129345194014";
     public ImageView mImageView;
     private String mCurrentPhotoPath;
+    private double currentLongitude;
+    private Location location;
+    private double currentLatitude;
+    private LocationManager locationManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +73,7 @@ public class MenuActivity extends AppCompatActivity
                 .build();
 
         mGoogleApiClient.connect();
-        new VerifySession().execute();
+        getLocation();
     }
 
 
@@ -118,27 +130,6 @@ public class MenuActivity extends AppCompatActivity
                                     }
                                 }
                             });
-/*            if (data != null) {
-                Bundle extras = data.getExtras();
-                Bitmap imageBitmap = (Bitmap) extras.get("data");
-                if (imageBitmap == null) {
-                    Log.d("NOPE:", "Bitmap missing");
-                    return;
-                }
-
-                Uri photoUri = (Uri) extras.get(MediaStore.EXTRA_OUTPUT);
-                if (photoUri == null) {
-                    Log.d("NOPE:", "Photo extra is missing");
-                    return;
-                }
-
-                Log.d("YEP:", "You win!");
-
-                mImageView.setImageBitmap(imageBitmap);
-                new UploadImage().execute(imageBitmap);
-            } else {
-                Log.e("NOPE", "No way dood");
-            } */
         }
     }
 
@@ -174,6 +165,63 @@ public class MenuActivity extends AppCompatActivity
         Log.d("YO CONNECT SUSPENDED:", Integer.toString(i));
     }
 
+    @Override
+    public void onLocationChanged(Location location) {
+        this.currentLatitude = location.getLatitude();
+        this.currentLongitude = location.getLongitude();
+
+        Log.d("LONGITUDE ", Double.toString(this.currentLongitude));
+        Log.d("LATITUDE ", Double.toString(this.currentLatitude));
+
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
+    }
+
+    private void getLocation() {
+        try {
+            locationManager = (LocationManager) this.getSystemService(LOCATION_SERVICE);
+
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
+            locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    5,
+                    10,
+                    this
+            );
+
+            location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+
     private class UploadImage extends AsyncTask<Bitmap, Void, String> {
 
         @Override
@@ -182,6 +230,8 @@ public class MenuActivity extends AppCompatActivity
 
             // String loginUrl = "http://192.168.0.164:8000/session-create-user";
             String imgurUrl = "https://api.imgur.com/3/image.json";
+            String cosUrl = "http://crime-or-sublime.herokuapp.com/graffiti-submit-new-submission";
+
             BufferedReader reader;
             StringBuilder stringBuilder;
             InputStreamReader responseStream;
@@ -190,40 +240,40 @@ public class MenuActivity extends AppCompatActivity
             String imageBase64Encoding;
             URL url;
             DataOutputStream bodyStream;
+            DataOutputStream cosBodyStream;
             String responseData;
-            JSONObject response;
-            JSONObject submission = new JSONObject();
+            JSONObject imgurResponse;
+            JSONObject imgurSubmission = new JSONObject();
+            JSONObject cosResponse;
+            JSONObject cosSubmission = new JSONObject();
             String stringResponse = null;
 
+            String graffitiUrl;
+
+            HttpURLConnection imgurConn;
+            HttpURLConnection cosConn;
+
             Bitmap imageBitmap = BitmapFactory.decodeFile(mCurrentPhotoPath);
-
-            Log.d("THE FILE:", mCurrentPhotoPath);
-
-            if (imageBitmap == null) {
-                Log.d("OMFG", "IT'S NULL");
-            } else {
-                Log.d("OMFG", "IT'S NOT NULL!!!");
-            }
 
             try {
 
                 url = new URL(imgurUrl);
 
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-type", "application/json");
-                conn.setRequestProperty("Authorization", "Client-ID " + IMGUR_ID);
-                bodyStream = new DataOutputStream(conn.getOutputStream());
+                imgurConn = (HttpURLConnection) url.openConnection();
+                imgurConn.setRequestMethod("POST");
+                imgurConn.setRequestProperty("Content-type", "application/json");
+                imgurConn.setRequestProperty("Authorization", "Client-ID " + IMGUR_ID);
+                bodyStream = new DataOutputStream(imgurConn.getOutputStream());
                 imageByteArrayOutputStream = new ByteArrayOutputStream();
                 imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, imageByteArrayOutputStream);
                 imageBinary = imageByteArrayOutputStream.toByteArray();
                 imageBase64Encoding = Base64.encodeToString(imageBinary, Base64.DEFAULT);
 
-                submission.put("image", imageBase64Encoding);
-                bodyStream.write(submission.toString().getBytes());
+                imgurSubmission.put("image", imageBase64Encoding);
+                bodyStream.write(imgurSubmission.toString().getBytes());
                 bodyStream.close();
 
-                responseStream = new InputStreamReader(conn.getInputStream());
+                responseStream = new InputStreamReader(imgurConn.getInputStream());
                 reader = new BufferedReader(responseStream);
                 stringBuilder = new StringBuilder();
                 while ((responseData = reader.readLine()) != null) {
@@ -233,13 +283,48 @@ public class MenuActivity extends AppCompatActivity
                 reader.close();
                 responseStream.close();
 
-                response = new JSONObject(stringBuilder.toString());
+                imgurResponse = new JSONObject(stringBuilder.toString());
 
-                stringResponse = response.toString();
+                stringResponse = imgurResponse.toString();
 
                 // Use this for debugging
-                Context context = getApplicationContext();
-                Log.d("ImgurResponse:", stringResponse);
+                Log.d("ImgurLink:", imgurResponse.getJSONObject("data").getString("link"));
+
+                graffitiUrl = new URL(imgurResponse.getJSONObject("data").getString("link")).getPath();
+                Log.d("GraffitiUrl:", graffitiUrl);
+                graffitiUrl = graffitiUrl.substring(1, graffitiUrl.indexOf('.'));
+                Log.d("Graffiti ID: ", graffitiUrl);
+
+                getLocation();
+                Log.d("Latitude", Double.toString(location.getLatitude()));
+                Log.d("Longitude", Double.toString(location.getLongitude()));
+
+                // Upload to CoS
+                url = new URL(cosUrl);
+                cosConn = (HttpURLConnection) url.openConnection();
+                cosConn.setRequestMethod("POST");
+                cosConn.setRequestProperty("Content-type", "application/json");
+                cosSubmission.put("id", graffitiUrl);
+                cosSubmission.put("latitude", location.getLatitude());
+                cosSubmission.put("longitude", location.getLongitude());
+                cosSubmission.put("recaptcha", "LeaveBlankForNow");
+                cosBodyStream = new DataOutputStream(cosConn.getOutputStream());
+
+
+                cosBodyStream.write(cosSubmission.toString().getBytes());
+                cosBodyStream.close();
+
+                stringBuilder = new StringBuilder();
+                responseStream = new InputStreamReader(cosConn.getInputStream());
+                reader = new BufferedReader(responseStream);
+
+                while ((responseData = reader.readLine()) != null) {
+                    stringBuilder.append(responseData);
+                }
+
+                Log.d("COS RESPONSE: ", stringBuilder.toString());
+
+
 
             } catch (JSONException e) {
                 e.printStackTrace();

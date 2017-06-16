@@ -28,4 +28,5 @@ dependencies {
     compile 'com.google.android.gms:play-services-basement:11.0.0'
     compile 'com.google.android.gms:play-services-safetynet:11.0.0'
     compile 'com.google.android.gms:play-services-tasks:11.0.0'
+    compile 'com.google.android.gms:play-services-location:11.0.0'
 }
