@@ -57,6 +57,7 @@ public class MenuActivity extends AppCompatActivity
     private Location location;
     private double currentLatitude;
     private LocationManager locationManager;
+    private String reCaptchaToken = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,7 +121,8 @@ public class MenuActivity extends AppCompatActivity
                                         if (!result.getTokenResult().isEmpty()) {
                                             // User response token must be validated using the
                                             // reCAPTCHA site verify API.
-                                            Log.d("THE TOKEN", result.getTokenResult().toString());
+                                            reCaptchaToken = result.getTokenResult().toString();
+                                            Log.d("THE TOKEN", reCaptchaToken);
                                             new UploadImage().execute();
 
                                         }
@@ -231,6 +233,7 @@ public class MenuActivity extends AppCompatActivity
             // String loginUrl = "http://192.168.0.164:8000/session-create-user";
             String imgurUrl = "https://api.imgur.com/3/image.json";
             String cosUrl = "http://crime-or-sublime.herokuapp.com/graffiti-submit-new-submission";
+            //String cosUrl = "http://192.168.0.164:8000/graffiti-submit-new-submission";
 
             BufferedReader reader;
             StringBuilder stringBuilder;
@@ -307,7 +310,7 @@ public class MenuActivity extends AppCompatActivity
                 cosSubmission.put("id", graffitiUrl);
                 cosSubmission.put("latitude", location.getLatitude());
                 cosSubmission.put("longitude", location.getLongitude());
-                cosSubmission.put("recaptcha", "LeaveBlankForNow");
+                cosSubmission.put("recaptcha", reCaptchaToken);
                 cosBodyStream = new DataOutputStream(cosConn.getOutputStream());
 
 
